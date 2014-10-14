@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
+<script type="text/javascript" src="http://code.createjs.com/preloadjs-0.4.1.min.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<script src="https://cdn.socket.io/socket.io-1.1.0.js"></script>
+	<title></title>
+</head>
+<style type="text/css">
+
+	canvas{
+		background-color: rgba(50, 50, 50, 0.2);
+		cursor:none; 
+	}
+
+	body{
+		display: block;
+	}
+</style>
+<body>	
+<center>
+<div class="modal fade" id="myModal" >
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        
+        <h4 class="modal-title">Iniciar</h4>
+      </div>
+      <div class="modal-body">
+        	<div class="form-group">
+			    <label for="inputEmail3" class="col-sm-2 control-label">Nombre</label>
+			    <div class="col-sm-10">
+			      	<input type="text" id="nick" class="form-control" id="inputEmail3" placeholder="Nombre" >
+			    </div>
+
+		  </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="ingresar()">Save changes</button>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+	<canvas id="Canvas" height="600" width="800"></canvas>
+</center>
+</body>
+
+
+<script type="text/javascript">
+
+</script>
+<script type="text/javascript">
+	var stage;
+	var player,enemigo;
+	var escudos=[],escudosEnemigos=[];
+	var grant,luffy;
+	var ultimaBolaFuego=createjs.Ticker.getTime()-5000;
+	var fuegoBoton,hieloBoton;
+	var ultimoEnvio=createjs.Ticker.getTime()-5000,ultimaEscudo=createjs.Ticker.getTime()-5000;
+	var vidaPlayer , vidaEnemigo;
+	var socket = io('http://hackersuololo.ddns.net:3000/');
+	$('#myModal').modal('show')
+	function ingresar(){
+		socket.emit('nick',$('#nick').val());
+		$('#myModal').modal('hide')
+	}
+
+
+	$(document).ready(function() {
+		
+		  //socket.on('connection', function (data) {
+		  //  iniciarJuego();
+		 //   console.log(data);
+		 //   socket.emit('my other event', { my: 'data' });
+		//  });
+
+		
+
+
+		socket.on('conectando', function(datos){
+				player=datos;
+				console.log("player: "+ player);
+			});
+		
+
+		socket.on('jugador conectado',function(e){
+			enemigo=e;
+			console.log("enemigo: " +enemigo.nombre);
+
+			iniciarJuego();
+		});
+
+		socket.on('posicion',function(e){
+			enemigo = e;
+			//console.log(e);
+		});
+
+		socket.on('bola de fuego',function(bola){
+			bolaDeFuego(bola,false);
+		});
+
+		socket.on('reiniciar',function(nombre){
+
+			vidaEnemigo.text="vida: 0";
+			alert("El juego a finalizado. El jugador "+nombre+" a sido derrotado.");
+
+			location.reload();
+		});
+
+		socket.on('vida',function(vida){
+			console.log("vida del enemigo: "+vida);
+			vidaEnemigo.text="vida: "+vida;
+		});
+
+
+		socket.on('escudo',function(escudo){
+			var escudo= crearEscudo(escudo)
+			escudosEnemigos.push(escudo);
+		});
+	});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function iniciarJuego(){
+	stage = new createjs.Stage("Canvas");
+
+
+    	manifest = [
+			{src:"imagenes/mago.png", id:"magito"},
+			{src:"imagenes/magoInverso.png", id:"magitoInverso"},
+			{src:"imagenes/fuegoT.png", id:"fuego"},
+			{src:"imagenes/hielo2.png", id:"hielo"},
+			{src:"imagenes/casa-png.png",id:"casa"},
+			{src:"imagenes/bombasFuego/bomb.png", id:"bomb"}
+		];
+
+		loader = new createjs.LoadQueue(false);
+		loader.addEventListener("complete", handleComplete);
+		loader.loadManifest(manifest);
+
+
+    	function handleComplete(){
+    		
+
+    		var ancho = stage.canvas.width;
+    		var alto = stage.canvas.height;
+ 
+    		//Armando el menu magico
+
+	    		var rect = new createjs.Shape();
+				rect.graphics.beginFill("skyblue").drawRect(0, alto-65,ancho ,100);
+				stage.addChild(rect);
+    		//cargando imagenes de ataques.
+	    		hieloBoton = new createjs.Bitmap(loader.getResult("hielo"));
+	    		hieloBoton.x=90;
+	    		hieloBoton.y=alto-30;
+	    		hieloBoton.regX=25;
+	    		hieloBoton.regY=25;
+	    		stage.addChild(hieloBoton);
+
+	    	
+	    		fuegoBoton = new createjs.Bitmap(loader.getResult("fuego"));
+	    		fuegoBoton.x=35;
+	    		fuegoBoton.y=alto-30;
+	    		fuegoBoton.regX=25;
+	    		fuegoBoton.regY=25;
+
+	    		stage.addChild(fuegoBoton);
+
+	    		textQ = new createjs.Text("Q", "bold 12px Arial", "blue");
+	    		textQ.x=20;
+	    		textQ.y=alto-45;
+	    		textW = new createjs.Text("W", "bold 12px Arial", "blue");
+	    		textW.x=70;
+	    		textW.y=alto-45;
+
+            	stage.addChild(textQ);
+				stage.addChild(textW);
+
+				
+	    		vidaPlayer = new createjs.Text("Vida: "+player['vida'], "bold 16px Arial", "#ff7700");
+	    		vidaPlayer.x=120;
+	    		vidaPlayer.y=alto-30;
+	    		vidaEnemigo = new createjs.Text("Vida: "+enemigo['vida'], "bold 16px Arial", "#ff7700");
+	    		vidaEnemigo.x=ancho/2+250;
+	    		vidaEnemigo.y=alto-30;
+
+            	stage.addChild(vidaPlayer);
+				stage.addChild(vidaEnemigo);
+
+    		//Creando linea divisora.
+    		var rect = new createjs.Shape();
+			rect.graphics.beginFill("black").drawRect((ancho/2-25), 0,50 ,alto);
+			stage.addChild(rect);
+
+			casa = new createjs.Bitmap(loader.getResult("casa"));
+			casa.x=(ancho/2-55);
+			casa.y=alto-115;
+			casa.scaleX=0.5;
+			casa.scaleY=0.5;
+			stage.addChild(casa);
+
+			//Agregando el magico re loco.
+			 var data = new createjs.SpriteSheet({
+			"images": [loader.getResult("magito")],
+			"frames": {"regX": 0, "height": 72, "count": 19, "regY": 0, "width": 72},
+			// define two animations, run (loops, 1.5x speed) and jump (returns to run):
+			"animations": {"nada": [0, 3, "nada", 0.1],
+			"suspiro": [4, 7, "nada", 0.15],
+			"ataque": [8,11, "nada", 0.15],
+			"ataque2": [12, 15, "nada", 0.15],
+			"ataque3": [16, 18, "nada", 0.15]}
+			});
+
+			grant = new createjs.Sprite(data, "nada");
+			grant.x = stage.mouseX-35;
+			grant.y = stage.mouseY-35;
+			grant.shadow =2;
+
+			var shadow = new createjs.Shadow("#000000", -10, 10, 15);
+			grant.shadow=shadow;
+			// Add Grant to the stage, and add it as a listener to Ticker to get updates each frame.
+			stage.addChild(grant);
+
+			//mago inverso
+			var data2 = new createjs.SpriteSheet({
+			"images": [loader.getResult("magitoInverso")],
+			"frames": {"regX": 0, "height": 72, "count": 19, "regY": 0, "width": 72},
+			// define two animations, run (loops, 1.5x speed) and jump (returns to run):
+			"animations": {"nada": [0, 3, "nada", 0.1],
+			"suspiro": [4, 7, "nada", 0.15],
+			"ataque": [8,11, "nada", 0.15],
+			"ataque2": [12, 15, "nada", 0.15],
+			"ataque3": [17, 18, "nada", 0.15]}
+			});
+
+			luffy = new createjs.Sprite(data2, "nada");
+			luffy.x = 600;
+			luffy.y = 200;
+			luffy.shadow =2;
+
+			var shadow = new createjs.Shadow("#000000", -10, 10, 15);
+			luffy.shadow=shadow;
+			// Add Grant to the stage, and add it as a listener to Ticker to get updates each frame.
+			stage.addChild(luffy);
+			createjs.Ticker.setFPS(60);
+			createjs.Ticker.addEventListener("tick", tick);
+
+
+
+
+			$( document ).keypress(function(event) {
+				console.log("codigo: "+ event.keyCode);
+			  if(event.keyCode ==115){
+			  	grant.gotoAndPlay("suspiro");
+			  }
+			   if(event.keyCode ==113){
+			   	if(createjs.Ticker.getTime()-ultimaBolaFuego>500){
+				  	grant.gotoAndPlay("ataque");
+				  	bolaDeFuego(grant,true);
+				  	ultimaBolaFuego=createjs.Ticker.getTime();
+			  	}
+			  }
+			   if(event.keyCode ==119){
+			   	if((createjs.Ticker.getTime()-ultimaEscudo)>5000){
+				  	grant.gotoAndPlay("ataque2");
+				  	escudo = crearEscudo(grant);
+				  	escudos.push(escudo);	
+
+				  	socket.emit('escudo',{x:stage.canvas.width-escudo['grafico'].x+30,y:escudo['grafico'].y-30});		   		
+				  }
+			  }
+			   if(event.keyCode ==101){
+			  	grant.gotoAndPlay("ataque3");
+			  }
+			});
+
+			stage.enableMouseOver(5);
+
+    		stage.on("stagemousemove", handleMouseEvent);
+
+    		function handleMouseEvent(evt) {
+    			if(createjs.Ticker.getTime()-ultimoEnvio>50){
+					//console.log("sdasdsa");
+					ultimoEnvio=createjs.Ticker.getTime();
+					player.x=grant.x;
+					player.y=grant.y;
+					socket.emit('posicion',player);
+				}
+			
+			// to save CPU, we're only updating when we need to, instead of on a tick:1
+			stage.update();
+		}
+    	}
+}
+
+
+
+
+	function bolaDeFuego(pj,soyYo){
+		
+
+			var bolaSprit = new createjs.SpriteSheet({
+			"images": [loader.getResult("bomb")],
+			"frames": {"regX": 0, "height": 237.5, "count": 12, "regY": 0, "width": 278.33333},
+			// define two animations, run (loops, 1.5x speed) and jump (returns to run):
+			"animations": {"explocion": [0, 9, "explocion", 0.05]}});
+
+			var bola = new createjs.Sprite(bolaSprit, "explocion");
+
+			bola.x = pj.x;
+			bola.y = pj.y;
+			bola.scaleX =0.4;
+			bola.scaleY=0.4;
+
+			var shadow = new createjs.Shadow("#000000", -5, 5, 5);
+			bola.shadow=shadow;
+
+			// Add Grant to the stage, and add it as a listener to Ticker to get updates each frame.
+			
+			if(soyYo){
+				bola.addEventListener('tick',tickBola);
+				socket.emit('bola de fuego',{x:(stage.canvas.width -pj.x),y:(pj.y)});
+			}	else{
+				luffy.gotoAndPlay("ataque");
+				bola.addEventListener('tick',tickBolaEnemigo);
+			}
+
+			stage.addChild(bola);
+	}
+
+	function tickBola(event){
+		event.currentTarget.x+=5;
+
+		$.each(escudosEnemigos, function( index, value ) {
+			console.log("revisando escudo");
+		  	var pt = event.currentTarget.localToLocal(100,80,value['grafico']);
+		  	if (value['grafico'].hitTest(pt.x, pt.y)) {
+			 	 event.currentTarget.x=9999;
+			 	  event.currentTarget.y=9999;
+			}
+		});
+
+		var pt = event.currentTarget.localToLocal(100,80,luffy);
+
+		if (luffy.hitTest(pt.x, pt.y)) {
+		 	event.currentTarget.x=9999;
+		 	event.currentTarget.y=9999;
+		 }
+		
+	}	
+
+	function tickBolaEnemigo(event){
+		event.currentTarget.x-=5;
+
+		var pt = event.currentTarget.localToLocal(0,80,grant);
+
+		if (grant.hitTest(pt.x, pt.y)) {
+		 	player.vida-=Math.floor(Math.random() * (20 - 5 + 1)) + 5;;
+		 	event.currentTarget.x=9999;
+		 	event.currentTarget.y=9999;
+
+		 	if(player.vida<=0){
+		 		player.vida=0;
+
+		 		socket.emit("finalizar",player.nombre);
+		 	}
+		 	vidaPlayer.text = "Vida: "+player.vida;
+		 	socket.emit("vida",player.vida);
+		}
+
+
+		$.each(escudos, function( index, value ) {
+			console.log("revisando escudo");
+		  	var pt = event.currentTarget.localToLocal(-50,80,value['grafico']);
+		  	if (value['grafico'].hitTest(pt.x, pt.y)) {
+			 	 event.currentTarget.x=9999;
+			 	  event.currentTarget.y=9999;
+			}
+		});
+
+		
+	}
+
+	function tick(event) {
+		//dibujar enemigo
+
+		luffy.x= stage.canvas.width -enemigo.x;
+		luffy.y=enemigo.y;
+
+
+		//giro vola de fuego
+
+		if(createjs.Ticker.getTime()-ultimaBolaFuego<500){
+			fuegoBoton.rotation=(360/500)*(createjs.Ticker.getTime()-ultimaBolaFuego);
+			var circle = new createjs.Shape();
+			circle.graphics.beginFill("red").drawCircle(0, 0, 1);
+			circle.scaleX= 25/500*(createjs.Ticker.getTime()-ultimaBolaFuego);
+			circle.scaleY= 25/500*(createjs.Ticker.getTime()-ultimaBolaFuego);
+			circle.x = 35;
+			circle.y = stage.canvas.height-30;
+
+			circle.alpha=0.2;
+
+			fuegoBoton.mask= circle;
+		}	else {
+			fuegoBoton.rotation=0;
+		}
+
+
+		//Escudo de hielo del player...
+
+
+		$.each(escudos, function( index, value ) {
+		  if((createjs.Ticker.getTime()-value['tiempo'])>3000){
+		  	value['grafico'].graphics.clear();
+		    
+		  	
+		  }
+
+		  	var circle2 = new createjs.Shape();
+
+			circle2.graphics.beginFill("red").drawCircle(0, 0, 1);
+			circle2.scaleX= 25/5000*(createjs.Ticker.getTime()-value['tiempo']);
+			circle2.scaleY= 25/5000*(createjs.Ticker.getTime()-value['tiempo']);
+			circle2.x = 90;
+			circle2.y = stage.canvas.height-30;
+
+			circle2.alpha=0.2;
+
+			hieloBoton.mask=circle2;
+			if((createjs.Ticker.getTime()-value['tiempo'])>5000){
+				hieloBoton.rotation=0;
+				escudos.splice(index, 1);
+			}	else{
+				hieloBoton.rotation=(360/5000)*(createjs.Ticker.getTime()-value['tiempo']);
+			}
+		  
+		  value['grafico'].alpha=value['grafico'].alpha/1.02;
+		});
+
+
+		//Escudo de hielo del otro player...
+
+		$.each(escudosEnemigos, function( index, value ) {
+		  if((createjs.Ticker.getTime()-value['tiempo'])>3000){
+		  	value['grafico'].graphics.clear();
+		  	escudosEnemigos.splice(index, 1);
+		  }
+
+		  value['grafico'].alpha=value['grafico'].alpha/1.02;
+		});
+
+
+		if(stage.mouseX-35 < stage.canvas.width/2-85){
+			grant.x= stage.mouseX-35;
+		}	else {
+			grant.x= stage.canvas.width/2-85;
+		}
+		
+		if(stage.mouseY-10 < stage.canvas.height-100){
+			grant.y= stage.mouseY-35;
+		}	else{
+			grant.y= stage.canvas.height-130;
+		}
+
+
+		stage.update(event);
+	}
+
+	function crearEscudo (pj) {
+		var circle = new createjs.Shape();
+		circle.graphics.beginFill("blue").drawCircle(0, 0, 50);
+		circle.x = pj.x+36;
+		circle.y = pj.y+36;
+		circle.alpha=0.5;
+
+		escudo={'grafico':circle,'tiempo':createjs.Ticker.getTime()};
+		
+		stage.addChild(circle);
+		ultimaEscudo=createjs.Ticker.getTime();
+		return escudo;
+	}
+</script>
+</html>
